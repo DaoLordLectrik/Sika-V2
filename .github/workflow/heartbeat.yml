@@ -1,0 +1,32 @@
+name: Heartbeat Check
+
+on:
+  # Hourly schedule - more reliable at lower frequency per spec
+  schedule:
+    - cron: "3 * * * *"
+  
+  workflow_dispatch:
+
+jobs:
+  check-heartbeat:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Run heartbeat check
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python scripts/heartbeat_check.py

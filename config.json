@@ -1,0 +1,22 @@
+{
+  "pairs": [
+    {
+      "symbol": "XBTUSD",
+      "label": "BTC/USD",
+      "interval": "15m"
+    },
+    {
+      "symbol": "PAXGUSD",
+      "label": "Gold (PAXG/USD)",
+      "interval": "15m",
+      "respect_market_hours": true
+    }
+  ],
+  "min_confidence_to_alert": 75,
+  "sl_atr_multiplier": 1.5,
+  "tp_atr_multiplier": 3.0,
+  "trend_filter_enabled": true,
+  "trend_filter_interval": "1h",
+  "heartbeat_max_gap_minutes": 40,
+  "min_atr_percentile": null
+}

@@ -153,6 +153,38 @@ def run_signal_check():
     print(f"{'='*60}")
     print(f"Signal Check - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC")
     print(f"{'='*60}")
+
+        # --- Add this test section at the end of the function ---
+    print("\n" + "="*60)
+    print("SENDING TEST TELEGRAM ALERT")
+    print("="*60)
+    
+    from scripts.signal_engine import Signal, format_signal_telegram
+    
+    test_signal = Signal(
+        pair="TEST",
+        label="🧪 TEST SIGNAL - Telegram is Working!",
+        timeframe="15m",
+        timestamp=datetime.now(),
+        price=77442.00,
+        direction="BUY",
+        confidence=100,
+        reasons=["This is a test alert to verify Telegram is configured correctly"],
+        stop_loss=77000.00,
+        take_profit=78500.00,
+        risk_reward_ratio=3.0
+    )
+    
+    telegram_text = format_signal_telegram(test_signal)
+    success = send_telegram_message(telegram_text, parse_mode="Markdown")
+    
+    if success:
+        print("✅ Test alert sent successfully!")
+        print("Check your Telegram for the test message.")
+    else:
+        print("❌ Failed to send test alert.")
+        print("Check TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID secrets.")
+    # --- End of test section ---
     
     # Load configuration
     config = load_config()

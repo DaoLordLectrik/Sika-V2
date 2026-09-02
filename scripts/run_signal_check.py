@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# Now import from scripts (these will work because PROJECT_ROOT is in sys.path)
+# Now import from scripts
 from scripts.fetch_data import get_klines, get_current_price
 from scripts.indicators import compute_all_indicators
 from scripts.signal_engine import generate_signal, get_trend_bias, format_signal_telegram
@@ -156,17 +156,11 @@ def run_signal_check():
     # Load configuration
     config = load_config()
     pairs = config.get('pairs', [])
-    min_confidence = config.get('min_confidence_to_alert', 60)
+    min_confidence = config.get('min_confidence_to_alert', 75)
     sl_mult = config.get('sl_atr_multiplier', 1.5)
     tp_mult = config.get('tp_atr_multiplier', 4.0)
     trend_filter_enabled = config.get('trend_filter_enabled', True)
     trend_interval = config.get('trend_filter_interval', '1h')
-    
-    # New filter parameters
-    min_atr_percentile = config.get('min_atr_percentile', 30)
-    max_atr_percentile = config.get('max_atr_percentile', 90)
-    volume_threshold = config.get('volume_threshold', 1.2)
-    adx_threshold = config.get('adx_threshold', 25)
     
     if not pairs:
         print("No pairs configured. Exiting.")
@@ -222,7 +216,7 @@ def run_signal_check():
                 else:
                     print(f"  Trend filter: unavailable (using no filter)")
             
-            # Generate signal with all filters
+            # Generate signal
             signal = generate_signal(
                 df=df,
                 pair=symbol,
@@ -230,11 +224,7 @@ def run_signal_check():
                 timeframe=interval,
                 sl_atr_multiplier=sl_mult,
                 tp_atr_multiplier=tp_mult,
-                trend_bias=trend_bias,
-                volume_threshold=volume_threshold,
-                min_atr_percentile=min_atr_percentile,
-                max_atr_percentile=max_atr_percentile,
-                adx_threshold=adx_threshold
+                trend_bias=trend_bias
             )
             
             print(f"  Direction: {signal.direction}")

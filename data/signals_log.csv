@@ -24,3 +24,6 @@ XBTUSD,BTC/USD,15m,2026-09-02T19:15:00,77364.4,HOLD,75,"EMA stack bullish (9>21>
 PAXGUSD,Gold (PAXG/USD),15m,2026-09-02T19:15:00,4385.97,HOLD,25,"EMA stack bullish (9>21>50); Bullish momentum (RSI=62.6); MACD bearish (line<8.41, hist=-1.22)",,,,False,2026-09-02T19:15:21.658126
 XBTUSD,BTC/USD,15m,2026-09-02T19:30:00,77102.5,HOLD,0,"EMA stack bullish (9>21>50); MACD bearish (line<70.87, hist=-18.98)",,,,False,2026-09-02T19:30:21.693452
 PAXGUSD,Gold (PAXG/USD),15m,2026-09-02T19:30:00,4391.59,HOLD,0,"EMA stack bullish (9>21>50); Bullish momentum (RSI=66.5); MACD bearish (line<8.35, hist=-0.61); Price at upper band (resistance rejection potential)",,,,False,2026-09-02T19:30:22.011374
+ETHUSD,ETH/USD,15m,2026-09-02T19:30:00,2384.81,SELL,50,"EMA stack bearish (9<21<50); MACD bearish (line<-0.39, hist=-0.14)",2397.6403776651186,2350.595659559683,2.6666666666666905,False,2026-09-02T19:40:13.146371
+XBTUSD,BTC/USD,15m,2026-09-02T19:30:00,77156.2,HOLD,0,"EMA stack bullish (9>21>50); MACD bearish (line<71.73, hist=-15.55)",,,,False,2026-09-02T19:40:13.637091
+PAXGUSD,Gold (PAXG/USD),15m,2026-09-02T19:30:00,4392.1,HOLD,0,"EMA stack bullish (9>21>50); Bullish momentum (RSI=66.9); MACD bearish (line<8.35, hist=-0.57); Price at upper band (resistance rejection potential)",,,,False,2026-09-02T19:40:13.974393

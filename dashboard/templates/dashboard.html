@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sika-V2 Trading Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #0a0e17;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid #1a2332;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #f7931a, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .header .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            background: #1a2332;
+            border-radius: 20px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .status-dot.online {
+            background: #00ff88;
+            box-shadow: 0 0 10px #00ff8844;
+        }
+        
+        .status-dot.offline {
+            background: #ff4444;
+            box-shadow: 0 0 10px #ff444444;
+        }
+        
+        /* Cards */
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: #111927;
+            border: 1px solid #1a2332;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            border-color: #2a3a55;
+            transform: translateY(-2px);
+        }
+        
+        .card .label {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #8899aa;
+            letter-spacing: 1px;
+        }
+        
+        .card .value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-top: 8px;
+        }
+        
+        .card .value.gold {
+            color: #f7931a;
+        }
+        .card .value.green {
+            color: #00ff88;
+        }
+        .card .value.blue {
+            color: #4a9eff;
+        }
+        .card .value.purple {
+            color: #a855f7;
+        }
+        .card .value.red {
+            color: #ff6b6b;
+        }
+        
+        /* Charts */
+        .charts {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-box {
+            background: #111927;
+            border: 1px solid #1a2332;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .chart-box h3 {
+            font-size: 14px;
+            color: #8899aa;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .chart-container {
+            height: 200px;
+            position: relative;
+        }
+        
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            height: 100%;
+            gap: 4px;
+        }
+        
+        .bar {
+            flex: 1;
+            background: linear-gradient(180deg, #4a9eff, #1a3a6a);
+            border-radius: 4px 4px 0 0;
+            transition: all 0.3s ease;
+            min-height: 4px;
+            position: relative;
+        }
+        
+        .bar:hover {
+            opacity: 0.8;
+            transform: scaleY(1.02);
+        }
+        
+        .bar .bar-label {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            color: #667788;
+        }
+        
+        /* Signal Table */
+        .table-section {
+            background: #111927;
+            border: 1px solid #1a2332;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+        
+        .table-section h3 {
+            padding: 20px 20px 0;
+            font-size: 14px;
+            color: #8899aa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            text-align: left;
+            padding: 12px 20px;
+            font-size: 12px;
+            color: #667788;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #1a2332;
+        }
+        
+        td {
+            padding: 12px 20px;
+            border-bottom: 1px solid #0a0e17;
+            font-size: 14px;
+        }
+        
+        td .buy {
+            color: #00ff88;
+            font-weight: 600;
+        }
+        
+        td .sell {
+            color: #ff6b6b;
+            font-weight: 600;
+        }
+        
+        td .hold {
+            color: #8899aa;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .badge.buy {
+            background: #00ff8822;
+            color: #00ff88;
+        }
+        
+        .badge.sell {
+            background: #ff6b6b22;
+            color: #ff6b6b;
+        }
+        
+        .badge.hold {
+            background: #8899aa22;
+            color: #8899aa;
+        }
+        
+        .badge.alerts-on {
+            background: #00ff8822;
+            color: #00ff88;
+        }
+        
+        .badge.alerts-off {
+            background: #ff6b6b22;
+            color: #ff6b6b;
+        }
+        
+        /* Reason Tags */
+        .reason-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        
+        .reason-tag {
+            background: #1a2332;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            color: #8899aa;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .charts {
+                grid-template-columns: 1fr;
+            }
+            
+            .cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667788;
+        }
+        
+        .loading .spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #1a2332;
+            border-top-color: #4a9eff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Health Bar */
+        .health-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .health-text {
+            font-size: 13px;
+            color: #8899aa;
+        }
+        
+        .pair-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            background: #1a2332;
+            color: #4a9eff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📊 Sika-V2 Dashboard</h1>
+            <div class="status" id="healthStatus">
+                <span class="status-dot online" id="statusDot"></span>
+                <span id="statusText">Loading...</span>
+            </div>
+        </div>
+        
+        <!-- Metrics Cards -->
+        <div class="cards" id="metricsCards">
+            <div class="card">
+                <div class="label">Total Signals</div>
+                <div class="value blue" id="totalSignals">-</div>
+            </div>
+            <div class="card">
+                <div class="label">BUY Signals</div>
+                <div class="value green" id="buySignals">-</div>
+            </div>
+            <div class="card">
+                <div class="label">SELL Signals</div>
+                <div class="value red" id="sellSignals">-</div>
+            </div>
+            <div class="card">
+                <div class="label">Avg Confidence</div>
+                <div class="value gold" id="avgConfidence">-%</div>
+            </div>
+            <div class="card">
+                <div class="label">Last Run</div>
+                <div class="value" style="font-size:16px;" id="lastRun">-</div>
+            </div>
+            <div class="card">
+                <div class="label">Heartbeat Status</div>
+                <div class="value" style="font-size:16px;" id="heartbeatStatus">-</div>
+            </div>
+        </div>
+        
+        <!-- Charts -->
+        <div class="charts">
+            <div class="chart-box">
+                <h3>📈 Hourly Signal Activity</h3>
+                <div class="chart-container">
+                    <div class="bar-chart" id="hourlyChart">
+                        <div class="loading"><div class="spinner"></div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="chart-box">
+                <h3>🎯 Signal Distribution</h3>
+                <div class="chart-container" id="pairDistribution">
+                    <div class="loading"><div class="spinner"></div></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Signals -->
+        <div class="table-section">
+            <h3>📋 Recent Signals</h3>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Pair</th>
+                            <th>Direction</th>
+                            <th>Price</th>
+                            <th>Confidence</th>
+                            <th>Reasons</th>
+                            <th>Alert</th>
+                        </tr>
+                    </thead>
+                    <tbody id="signalTable">
+                        <tr><td colspan="7" class="loading">Loading signals...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Refresh data every 30 seconds
+        setInterval(loadData, 30000);
+        
+        function loadData() {
+            loadMetrics();
+            loadSignals();
+            loadHealth();
+        }
+        
+        async function loadMetrics() {
+            try {
+                const response = await fetch('/api/metrics');
+                const data = await response.json();
+                
+                document.getElementById('totalSignals').textContent = data.total_alerts || 0;
+                document.getElementById('buySignals').textContent = data.buy_signals || 0;
+                document.getElementById('sellSignals').textContent = data.sell_signals || 0;
+                document.getElementById('avgConfidence').textContent = (data.avg_confidence || 0) + '%';
+                
+                // Update hourly chart
+                if (data.hourly_activity) {
+                    updateHourlyChart(data.hourly_activity);
+                }
+                
+                // Update pair distribution
+                if (data.pair_counts) {
+                    updatePairDistribution(data.pair_counts);
+                }
+                
+                // Update latest signal time
+                if (data.latest_signal && data.latest_signal.log_time) {
+                    const time = new Date(data.latest_signal.log_time);
+                    document.getElementById('lastRun').textContent = time.toLocaleString();
+                }
+            } catch (e) {
+                console.error('Error loading metrics:', e);
+            }
+        }
+        
+        async function loadSignals() {
+            try {
+                const response = await fetch('/api/signals?limit=20');
+                const signals = await response.json();
+                
+                const tbody = document.getElementById('signalTable');
+                
+                if (!signals || signals.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#667788;">No signals yet</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = signals.map(s => {
+                    const direction = s.direction || 'HOLD';
+                    const directionClass = direction.toLowerCase();
+                    const time = new Date(s.timestamp);
+                    const reasons = s.reasons ? s.reasons.split(';').slice(0, 3) : [];
+                    const alerted = s.alerted === true || s.alerted === 'True';
+                    
+                    return `
+                        <tr>
+                            <td style="font-size:13px;color:#8899aa;">${time.toLocaleString()}</td>
+                            <td><span class="pair-badge">${s.label || s.pair}</span></td>
+                            <td><span class="badge ${directionClass}">${direction}</span></td>
+                            <td>$${parseFloat(s.price).toFixed(2)}</td>
+                            <td>${s.confidence || 0}%</td>
+                            <td>
+                                <div class="reason-tags">
+                                    ${reasons.map(r => `<span class="reason-tag">${r.trim()}</span>`).join('')}
+                                    ${reasons.length < s.reasons.split(';').length ? `<span class="reason-tag">+${s.reasons.split(';').length - reasons.length} more</span>` : ''}
+                                </div>
+                            </td>
+                            <td><span class="badge ${alerted ? 'alerts-on' : 'alerts-off'}">${alerted ? '✅ Sent' : '⏸️ Supressed'}</span></td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Error loading signals:', e);
+            }
+        }
+        
+        async function loadHealth() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                
+                const dot = document.getElementById('statusDot');
+                const text = document.getElementById('statusText');
+                const heartbeat = document.getElementById('heartbeatStatus');
+                
+                if (data.status === 'healthy' && data.heartbeat_ok) {
+                    dot.className = 'status-dot online';
+                    text.textContent = 'Online';
+                    heartbeat.textContent = '✅ Healthy';
+                    heartbeat.style.color = '#00ff88';
+                } else {
+                    dot.className = 'status-dot offline';
+                    text.textContent = data.minutes_since_last_run ? `⚠️ ${data.minutes_since_last_run}m ago` : 'Offline';
+                    heartbeat.textContent = '⚠️ Check bot';
+                    heartbeat.style.color = '#ff6b6b';
+                }
+                
+                if (data.minutes_since_last_run) {
+                    const timeEl = document.getElementById('lastRun');
+                    if (!timeEl.textContent.includes(':')) {
+                        const mins = data.minutes_since_last_run;
+                        timeEl.textContent = `${mins.toFixed(0)} minutes ago`;
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading health:', e);
+            }
+        }
+        
+        function updateHourlyChart(activity) {
+            const container = document.getElementById('hourlyChart');
+            const maxVal = Math.max(...Object.values(activity), 1);
+            
+            const bars = Object.entries(activity).map(([hour, count]) => {
+                const height = (count / maxVal) * 100;
+                return `
+                    <div class="bar" style="height: ${Math.max(height, 10)}%;">
+                        <div class="bar-label">${hour}h</div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = bars || '<div style="text-align:center;color:#667788;padding:20px;">No hourly data</div>';
+        }
+        
+        function updatePairDistribution(pairCounts) {
+            const container = document.getElementById('pairDistribution');
+            const total = Object.values(pairCounts).reduce((a, b) => a + b, 0);
+            
+            if (total === 0) {
+                container.innerHTML = '<div style="text-align:center;color:#667788;padding:20px;">No pair data</div>';
+                return;
+            }
+            
+            const colors = ['#4a9eff', '#f7931a', '#00ff88', '#a855f7', '#ff6b6b'];
+            let colorIndex = 0;
+            
+            const items = Object.entries(pairCounts).map(([pair, count]) => {
+                const pct = (count / total * 100).toFixed(1);
+                const color = colors[colorIndex++ % colors.length];
+                const label = pair.replace('USD', '');
+                return `
+                    <div style="display:flex;align-items:center;gap:10px;padding:4px 0;">
+                        <span style="width:60px;font-size:13px;color:#8899aa;">${label}</span>
+                        <div style="flex:1;height:20px;background:#1a2332;border-radius:10px;overflow:hidden;">
+                            <div style="width:${pct}%;height:100%;background:${color};border-radius:10px;transition:width 0.5s;"></div>
+                        </div>
+                        <span style="font-size:13px;font-weight:600;color:#e0e0e0;">${pct}%</span>
+                        <span style="font-size:12px;color:#667788;">(${count})</span>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = items || '<div style="text-align:center;color:#667788;padding:20px;">No data</div>';
+        }
+        
+        // Initial load
+        loadData();
+    </script>
+</body>
+</html>

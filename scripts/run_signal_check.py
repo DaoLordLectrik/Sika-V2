@@ -11,9 +11,12 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
-# Add project root to path
-sys.path.append(str(Path(__file__).parent.parent))
+# Add the parent directory to sys.path so we can import scripts modules
+# This allows us to use "from scripts.xxx import" when running from the root
+# and also when running the script directly
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Now import from scripts (this will work whether running from root or inside scripts)
 from scripts.fetch_data import get_klines, get_current_price
 from scripts.indicators import compute_all_indicators
 from scripts.signal_engine import generate_signal, get_trend_bias, format_signal_telegram

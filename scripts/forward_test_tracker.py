@@ -9,7 +9,8 @@ import numpy as np
 from datetime import datetime, timedelta
 import json
 
-sys.path.append(str(Path(__file__).parent.parent))
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.fetch_data import get_historical_klines_binance
 from scripts.backtest import map_kraken_to_binance

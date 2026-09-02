@@ -10,7 +10,8 @@ from typing import List, Dict, Any
 import argparse
 import json
 
-sys.path.append(str(Path(__file__).parent.parent))
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.fetch_data import get_historical_klines_binance
 from scripts.indicators import compute_all_indicators

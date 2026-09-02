@@ -10,8 +10,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional, Any
 import argparse
 
-# Add project root to path
-sys.path.append(str(Path(__file__).parent.parent))
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.fetch_data import get_historical_klines_binance
 from scripts.indicators import compute_all_indicators

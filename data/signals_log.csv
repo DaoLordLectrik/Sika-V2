@@ -1,1 +1,4 @@
 pair,label,timeframe,timestamp,price,direction,confidence,stop_loss,take_profit,risk_reward_ratio,alerted,log_time
+ETHUSD,ETH/USD,15m,2026-09-02T20:30:00,2394.41,HOLD,25,,,,False,2026-09-02T20:38:03.715304
+XBTUSD,BTC/USD,15m,2026-09-02T20:30:00,77448.7,HOLD,75,,,,False,2026-09-02T20:38:04.153432
+PAXGUSD,Gold (PAXG/USD),15m,2026-09-02T20:30:00,4396.11,HOLD,25,,,,False,2026-09-02T20:38:04.589394

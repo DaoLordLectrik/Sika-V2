@@ -2,14 +2,14 @@
   "pair": "PAXGUSD",
   "label": "Gold (PAXG/USD)",
   "timeframe": "15m",
-  "timestamp": "2026-09-02T18:45:00",
-  "price": 4383.06,
+  "timestamp": "2026-09-02T19:30:00",
+  "price": 4391.59,
   "direction": "HOLD",
   "confidence": 0,
-  "reasons": "EMA stack bullish (9>21>50); Strong bullish momentum (RSI=60.5); MACD bearish (line<9.03, hist=-1.55); Low volume (0.00x avg); Low volatility - choppy market (2th percentile); Strong trend (ADX=33.1)",
+  "reasons": "EMA stack bullish (9>21>50); Bullish momentum (RSI=66.5); MACD bearish (line<8.35, hist=-0.61); Price at upper band (resistance rejection potential)",
   "stop_loss": null,
   "take_profit": null,
   "risk_reward_ratio": null,
   "alerted": false,
-  "log_time": "2026-09-02T18:45:21.350618"
+  "log_time": "2026-09-02T19:30:22.011374"
 }

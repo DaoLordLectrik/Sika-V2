@@ -66,20 +66,27 @@ def log_signal(signal: Dict[str, Any], alerted: bool = False):
     """Log signal to CSV and latest JSON."""
     ensure_data_dir()
     
+    # Create a copy of the signal dict without reasons
+    log_entry = signal.copy()
+    
+    # Remove reasons from CSV logging (keep in JSON for reference)
+    if 'reasons' in log_entry:
+        del log_entry['reasons']
+    
     # Add alerted flag and timestamp
-    signal['alerted'] = alerted
-    signal['log_time'] = datetime.now().isoformat()
+    log_entry['alerted'] = alerted
+    log_entry['log_time'] = datetime.now().isoformat()
     
     # Append to CSV
     file_exists = SIGNALS_LOG.exists()
     
     with open(SIGNALS_LOG, 'a', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=signal.keys())
+        writer = csv.DictWriter(f, fieldnames=log_entry.keys())
         if not file_exists:
             writer.writeheader()
-        writer.writerow(signal)
+        writer.writerow(log_entry)
     
-    # Update latest signals JSON (overwrite)
+    # Update latest signals JSON (keep reasons here for reference)
     with open(LATEST_SIGNALS, 'w') as f:
         json.dump(signal, f, indent=2)
 

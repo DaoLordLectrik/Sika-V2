@@ -34,7 +34,6 @@ class Signal:
             'price': self.price,
             'direction': self.direction,
             'confidence': self.confidence,
-            'reasons': '; '.join(self.reasons),
             'stop_loss': self.stop_loss,
             'take_profit': self.take_profit,
             'risk_reward_ratio': self.risk_reward_ratio

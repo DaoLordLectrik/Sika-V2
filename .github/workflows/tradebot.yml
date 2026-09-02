@@ -1,12 +1,8 @@
 name: Trading Signal Bot
 
 on:
-  # Native schedule (best effort - see spec section 2.3)
   schedule:
-    # Offset from quarter-hour to avoid congestion
     - cron: "7,22,37,52 * * * *"
-  
-  # External trigger via workflow_dispatch (primary mechanism)
   workflow_dispatch:
 
 jobs:

@@ -11,12 +11,14 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
-# Add the parent directory to sys.path so we can import scripts modules
-# This allows us to use "from scripts.xxx import" when running from the root
-# and also when running the script directly
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Get the absolute path to the project root (Sika-V2)
+PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 
-# Now import from scripts (this will work whether running from root or inside scripts)
+# Add the project root to Python path so we can import scripts modules
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# Now import from scripts (these will work because PROJECT_ROOT is in sys.path)
 from scripts.fetch_data import get_klines, get_current_price
 from scripts.indicators import compute_all_indicators
 from scripts.signal_engine import generate_signal, get_trend_bias, format_signal_telegram
@@ -24,7 +26,7 @@ from scripts.telegram_alert import send_telegram_message
 
 
 # Constants
-DATA_DIR = Path(__file__).parent.parent / "data"
+DATA_DIR = PROJECT_ROOT / "data"
 SIGNALS_LOG = DATA_DIR / "signals_log.csv"
 LATEST_SIGNALS = DATA_DIR / "latest_signals.json"
 ALERT_STATE = DATA_DIR / "alert_state.json"
@@ -37,7 +39,7 @@ def ensure_data_dir():
 
 def load_config() -> Dict[str, Any]:
     """Load configuration from config.json."""
-    config_path = Path(__file__).parent.parent / "config.json"
+    config_path = PROJECT_ROOT / "config.json"
     
     if not config_path.exists():
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
@@ -104,9 +106,6 @@ def check_market_hours(pair_config: Dict[str, Any], now_utc: datetime) -> bool:
     hour = now_utc.hour
     minute = now_utc.minute
     
-    # Buffer period (in hours)
-    BUFFER_HOURS = 1
-    
     # Market closes at 22:00 UTC on Friday, opens at 22:00 UTC on Sunday
     # With buffer: closes at 21:00 UTC Friday, opens at 23:00 UTC Sunday
     
@@ -157,11 +156,17 @@ def run_signal_check():
     # Load configuration
     config = load_config()
     pairs = config.get('pairs', [])
-    min_confidence = config.get('min_confidence_to_alert', 75)
+    min_confidence = config.get('min_confidence_to_alert', 60)
     sl_mult = config.get('sl_atr_multiplier', 1.5)
-    tp_mult = config.get('tp_atr_multiplier', 3.0)
+    tp_mult = config.get('tp_atr_multiplier', 4.0)
     trend_filter_enabled = config.get('trend_filter_enabled', True)
     trend_interval = config.get('trend_filter_interval', '1h')
+    
+    # New filter parameters
+    min_atr_percentile = config.get('min_atr_percentile', 30)
+    max_atr_percentile = config.get('max_atr_percentile', 90)
+    volume_threshold = config.get('volume_threshold', 1.2)
+    adx_threshold = config.get('adx_threshold', 25)
     
     if not pairs:
         print("No pairs configured. Exiting.")
@@ -184,7 +189,6 @@ def run_signal_check():
         # Check market hours (if applicable)
         if not check_market_hours(pair_config, now_utc):
             print(f"  Market closed - skipping analysis (will still log if data available)")
-            # Still fetch data and log, but suppress alerts
             market_open = False
         else:
             market_open = True
@@ -218,7 +222,7 @@ def run_signal_check():
                 else:
                     print(f"  Trend filter: unavailable (using no filter)")
             
-            # Generate signal
+            # Generate signal with all filters
             signal = generate_signal(
                 df=df,
                 pair=symbol,
@@ -226,7 +230,11 @@ def run_signal_check():
                 timeframe=interval,
                 sl_atr_multiplier=sl_mult,
                 tp_atr_multiplier=tp_mult,
-                trend_bias=trend_bias
+                trend_bias=trend_bias,
+                volume_threshold=volume_threshold,
+                min_atr_percentile=min_atr_percentile,
+                max_atr_percentile=max_atr_percentile,
+                adx_threshold=adx_threshold
             )
             
             print(f"  Direction: {signal.direction}")

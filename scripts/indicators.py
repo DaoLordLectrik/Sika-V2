@@ -114,6 +114,48 @@ def atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> 
     return atr
 
 
+def adx(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
+    """
+    Calculate Average Directional Index.
+    Measures trend strength regardless of direction.
+    
+    Args:
+        high: High prices
+        low: Low prices
+        close: Close prices
+        period: ADX period
+    
+    Returns:
+        ADX values (0-100, higher = stronger trend)
+    """
+    # Calculate +DM and -DM
+    up_move = high.diff()
+    down_move = -low.diff()
+    
+    plus_dm = pd.Series(index=high.index, dtype=float)
+    minus_dm = pd.Series(index=high.index, dtype=float)
+    
+    plus_dm[(up_move > down_move) & (up_move > 0)] = up_move
+    minus_dm[(down_move > up_move) & (down_move > 0)] = down_move
+    
+    plus_dm.fillna(0, inplace=True)
+    minus_dm.fillna(0, inplace=True)
+    
+    # Smooth with Wilder's method
+    atr_period = atr(high, low, close, period)
+    
+    # Avoid division by zero
+    atr_period = atr_period.replace(0, 0.001)
+    
+    plus_di = 100 * plus_dm.ewm(alpha=1/period, adjust=False).mean() / atr_period
+    minus_di = 100 * minus_dm.ewm(alpha=1/period, adjust=False).mean() / atr_period
+    
+    dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di + 0.001)
+    adx = dx.ewm(alpha=1/period, adjust=False).mean()
+    
+    return adx
+
+
 def compute_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
     Compute all technical indicators and enrich the DataFrame.
@@ -149,5 +191,16 @@ def compute_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     
     # ATR
     df['atr_14'] = atr(high, low, close, 14)
+    
+    # ADX (trend strength)
+    df['adx_14'] = adx(high, low, close, 14)
+    
+    # Volume
+    df['volume_ma'] = df['volume'].rolling(window=20).mean()
+    df['volume_ratio'] = df['volume'] / df['volume_ma'].replace(0, 0.001)
+    
+    # ATR Percentile (rolling window)
+    df['atr_percentile'] = df['atr_14'].rolling(window=50, min_periods=20).rank(pct=True)
+    df['atr_percentile'] = df['atr_percentile'] * 100  # Convert to percentage
     
     return df

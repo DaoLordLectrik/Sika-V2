@@ -1,5 +1,5 @@
 """
-Signal engine - core trading logic with 4 scoring functions.
+Signal engine - core trading logic with 7 scoring functions.
 """
 
 import pandas as pd
@@ -95,13 +95,13 @@ def score_momentum(row: pd.Series) -> Tuple[int, str]:
     if pd.isna(rsi):
         return 0, "RSI unavailable"
     
-    if rsi < 30:
-        return 1, f"Oversold bounce potential (RSI={rsi:.1f})"
-    elif rsi > 70:
-        return -1, f"Overbought reversal potential (RSI={rsi:.1f})"
-    elif 55 <= rsi <= 70:
-        return 1, f"Bullish momentum (RSI={rsi:.1f})"
-    elif 30 <= rsi < 45:
+    if rsi < 25:
+        return 1, f"Strong oversold bounce (RSI={rsi:.1f})"
+    elif rsi > 75:
+        return -1, f"Strong overbought reversal (RSI={rsi:.1f})"
+    elif 60 <= rsi <= 75:
+        return 1, f"Strong bullish momentum (RSI={rsi:.1f})"
+    elif 25 <= rsi < 40:
         return -1, f"Bearish momentum (RSI={rsi:.1f})"
     else:
         return 0, f"Neutral momentum (RSI={rsi:.1f})"
@@ -154,13 +154,88 @@ def score_mean_reversion(row: pd.Series) -> Tuple[int, str]:
         return 0, f"Price above middle band, near resistance"
 
 
+def score_volume(row: pd.Series, threshold: float = 1.2) -> Tuple[int, str]:
+    """
+    Volume confirmation filter.
+    
+    Args:
+        row: Data row with volume_ratio
+        threshold: Minimum volume ratio for confirmation
+    
+    Returns:
+        (vote, reason) where vote is -1, 0, or +1
+    """
+    volume_ratio = row.get('volume_ratio', 0)
+    
+    if pd.isna(volume_ratio):
+        return 0, "Volume data unavailable"
+    
+    if volume_ratio > threshold:
+        return 1, f"Volume confirmed ({volume_ratio:.2f}x avg)"
+    else:
+        return -1, f"Low volume ({volume_ratio:.2f}x avg)"
+
+
+def score_volatility(row: pd.Series, min_percentile: int = 30, max_percentile: int = 90) -> Tuple[int, str]:
+    """
+    Volatility filter using ATR percentile.
+    
+    Args:
+        row: Data row with atr_percentile
+        min_percentile: Minimum percentile for optimal volatility
+        max_percentile: Maximum percentile for optimal volatility
+    
+    Returns:
+        (vote, reason) where vote is -1, 0, or +1
+    """
+    atr_percentile = row.get('atr_percentile', 50)
+    
+    if pd.isna(atr_percentile):
+        return 0, "ATR percentile unavailable"
+    
+    if atr_percentile < min_percentile:
+        return -1, f"Low volatility - choppy market ({atr_percentile:.0f}th percentile)"
+    elif atr_percentile > max_percentile:
+        return -1, f"High volatility - risky ({atr_percentile:.0f}th percentile)"
+    else:
+        return 1, f"Optimal volatility ({atr_percentile:.0f}th percentile)"
+
+
+def score_trend_strength(row: pd.Series, threshold: float = 25) -> Tuple[int, str]:
+    """
+    Trend strength filter using ADX.
+    
+    Args:
+        row: Data row with adx_14
+        threshold: Minimum ADX for strong trend
+    
+    Returns:
+        (vote, reason) where vote is -1, 0, or +1
+    """
+    adx_val = row.get('adx_14', 0)
+    
+    if pd.isna(adx_val):
+        return 0, "ADX unavailable"
+    
+    if adx_val > threshold:
+        return 1, f"Strong trend (ADX={adx_val:.1f})"
+    elif adx_val > 20:
+        return 0, f"Moderate trend (ADX={adx_val:.1f})"
+    else:
+        return -1, f"Weak/choppy trend - avoid (ADX={adx_val:.1f})"
+
+
 def generate_signal_from_row(row: pd.Series, 
                             pair: str = "Unknown",
                             label: str = "Unknown",
                             timeframe: str = "15m",
                             sl_atr_multiplier: float = 1.5,
-                            tp_atr_multiplier: float = 3.0,
-                            trend_bias: Optional[str] = None) -> Signal:
+                            tp_atr_multiplier: float = 4.0,
+                            trend_bias: Optional[str] = None,
+                            volume_threshold: float = 1.2,
+                            min_atr_percentile: int = 30,
+                            max_atr_percentile: int = 90,
+                            adx_threshold: float = 25) -> Signal:
     """
     Generate a signal from a single row of indicator data.
     
@@ -174,41 +249,52 @@ def generate_signal_from_row(row: pd.Series,
         sl_atr_multiplier: Stop-loss multiplier for ATR
         tp_atr_multiplier: Take-profit multiplier for ATR
         trend_bias: Optional trend bias from higher timeframe
+        volume_threshold: Minimum volume ratio for confirmation
+        min_atr_percentile: Minimum ATR percentile for trading
+        max_atr_percentile: Maximum ATR percentile for trading
+        adx_threshold: Minimum ADX for trend strength
     
     Returns:
         Signal object
     """
-    # Calculate all four scores
+    # Primary scoring (4 indicators)
     trend_score, trend_reason = score_trend(row)
     momentum_score, momentum_reason = score_momentum(row)
     macd_score, macd_reason = score_macd(row)
     meanrev_score, meanrev_reason = score_mean_reversion(row)
     
-    # Sum votes
-    total_score = trend_score + momentum_score + macd_score + meanrev_score
+    # Quality filters (3 indicators)
+    volume_score, volume_reason = score_volume(row, volume_threshold)
+    volatility_score, volatility_reason = score_volatility(row, min_atr_percentile, max_atr_percentile)
+    trend_strength_score, trend_strength_reason = score_trend_strength(row, adx_threshold)
+    
+    # Sum all scores (7 indicators now)
+    total_score = (trend_score + momentum_score + macd_score + meanrev_score + 
+                   volume_score + volatility_score + trend_strength_score)
     
     # Collect reasons
     reasons = []
-    if trend_score != 0:
-        reasons.append(trend_reason)
-    if momentum_score != 0:
-        reasons.append(momentum_reason)
-    if macd_score != 0:
-        reasons.append(macd_reason)
-    if meanrev_score != 0:
-        reasons.append(meanrev_reason)
+    for score, reason in [
+        (trend_score, trend_reason),
+        (momentum_score, momentum_reason),
+        (macd_score, macd_reason),
+        (meanrev_score, meanrev_reason),
+        (volume_score, volume_reason),
+        (volatility_score, volatility_reason),
+        (trend_strength_score, trend_strength_reason)
+    ]:
+        if score != 0:
+            reasons.append(reason)
     
-    # Calculate confidence (0, 25, 50, 75, 100)
-    confidence = int(abs(total_score) / 4 * 100)
+    # Calculate confidence (out of 7)
+    max_score = 7
+    confidence = int(abs(total_score) / max_score * 100)
     
-    # Determine direction
-    if confidence >= 50:  # At least 2 votes
-        if total_score >= 2:
-            direction = "BUY"
-        elif total_score <= -2:
-            direction = "SELL"
-        else:
-            direction = "HOLD"
+    # Determine direction (at least 3 positive out of 7)
+    if total_score >= 3:
+        direction = "BUY"
+    elif total_score <= -3:
+        direction = "SELL"
     else:
         direction = "HOLD"
     
@@ -223,18 +309,18 @@ def generate_signal_from_row(row: pd.Series,
     
     # Calculate TP/SL if BUY or SELL
     price = row.get('close')
-    atr = row.get('atr_14')
+    atr_val = row.get('atr_14')
     stop_loss = None
     take_profit = None
     risk_reward_ratio = None
     
-    if direction != "HOLD" and price is not None and atr is not None and not pd.isna(atr):
+    if direction != "HOLD" and price is not None and atr_val is not None and not pd.isna(atr_val):
         if direction == "BUY":
-            stop_loss = price - (sl_atr_multiplier * atr)
-            take_profit = price + (tp_atr_multiplier * atr)
+            stop_loss = price - (sl_atr_multiplier * atr_val)
+            take_profit = price + (tp_atr_multiplier * atr_val)
         else:  # SELL
-            stop_loss = price + (sl_atr_multiplier * atr)
-            take_profit = price - (tp_atr_multiplier * atr)
+            stop_loss = price + (sl_atr_multiplier * atr_val)
+            take_profit = price - (tp_atr_multiplier * atr_val)
         
         # Calculate risk-reward ratio
         if stop_loss is not None and take_profit is not None:
@@ -268,8 +354,12 @@ def generate_signal(df: pd.DataFrame,
                    label: str = "Unknown",
                    timeframe: str = "15m",
                    sl_atr_multiplier: float = 1.5,
-                   tp_atr_multiplier: float = 3.0,
-                   trend_bias: Optional[str] = None) -> Signal:
+                   tp_atr_multiplier: float = 4.0,
+                   trend_bias: Optional[str] = None,
+                   volume_threshold: float = 1.2,
+                   min_atr_percentile: int = 30,
+                   max_atr_percentile: int = 90,
+                   adx_threshold: float = 25) -> Signal:
     """
     Convenience wrapper that generates a signal from the last row.
     
@@ -281,6 +371,10 @@ def generate_signal(df: pd.DataFrame,
         sl_atr_multiplier: Stop-loss multiplier for ATR
         tp_atr_multiplier: Take-profit multiplier for ATR
         trend_bias: Optional trend bias from higher timeframe
+        volume_threshold: Minimum volume ratio for confirmation
+        min_atr_percentile: Minimum ATR percentile for trading
+        max_atr_percentile: Maximum ATR percentile for trading
+        adx_threshold: Minimum ADX for trend strength
     
     Returns:
         Signal from the last row
@@ -300,7 +394,8 @@ def generate_signal(df: pd.DataFrame,
     row = df.iloc[-1].copy()
     return generate_signal_from_row(
         row, pair, label, timeframe,
-        sl_atr_multiplier, tp_atr_multiplier, trend_bias
+        sl_atr_multiplier, tp_atr_multiplier, trend_bias,
+        volume_threshold, min_atr_percentile, max_atr_percentile, adx_threshold
     )
 
 

@@ -69,7 +69,7 @@ def log_signal(signal: Dict[str, Any], alerted: bool = False):
     # Create a copy of the signal dict without reasons
     log_entry = signal.copy()
     
-    # Remove reasons from CSV logging (keep in JSON for reference)
+    # Remove reasons from CSV logging
     if 'reasons' in log_entry:
         del log_entry['reasons']
     
@@ -107,14 +107,9 @@ def check_market_hours(pair_config: Dict[str, Any], now_utc: datetime) -> bool:
         return True
     
     # Gold market hours (example: closes weekends, with buffer)
-    # Sunday 10pm UTC close - Friday 10pm UTC open
-    # With 1-hour buffer on each side
     weekday = now_utc.weekday()  # Monday=0, Sunday=6
     hour = now_utc.hour
     minute = now_utc.minute
-    
-    # Market closes at 22:00 UTC on Friday, opens at 22:00 UTC on Sunday
-    # With buffer: closes at 21:00 UTC Friday, opens at 23:00 UTC Sunday
     
     # Friday after 21:00 UTC -> closed
     if weekday == 4 and (hour > 21 or (hour == 21 and minute >= 0)):
@@ -256,9 +251,20 @@ def run_signal_check():
                 should_alert = False
                 alert_reason = "Market closed"
             else:
-                # Check deduplication
+                # ============================================================
+                # DEDUPLICATION WITH TIME-BASED RESET (2 HOURS)
+                # ============================================================
                 last_alerted_dir = alert_state.get(symbol, {}).get('last_alerted_direction')
                 last_alert_time = alert_state.get(symbol, {}).get('last_alert_time')
+                
+                # Calculate time since last alert (in hours)
+                time_since_last = 999
+                if last_alert_time:
+                    try:
+                        last_time = datetime.fromisoformat(last_alert_time)
+                        time_since_last = (now_utc - last_time).total_seconds() / 3600
+                    except:
+                        pass
                 
                 if last_alerted_dir is None:
                     # No previous alert, send it
@@ -268,10 +274,14 @@ def run_signal_check():
                     # Direction changed, send it
                     should_alert = True
                     alert_reason = f"Direction changed from {last_alerted_dir} to {signal.direction}"
+                elif time_since_last >= 2:  # 2 hours reset
+                    # Same direction but enough time has passed
+                    should_alert = True
+                    alert_reason = f"Same {signal.direction} after {time_since_last:.1f} hours (reset)"
                 else:
-                    # Same direction as last alert, don't send
+                    # Same direction and too soon
                     should_alert = False
-                    alert_reason = f"Duplicate {signal.direction} (last alerted {last_alert_time})"
+                    alert_reason = f"Duplicate {signal.direction} (last alerted {time_since_last:.1f} hours ago)"
             
             # Send alert if eligible
             if should_alert:

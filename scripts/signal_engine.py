@@ -1,6 +1,5 @@
 """
 Signal engine - core trading logic with 4 scoring functions.
-Simplified version - filters removed based on backtest results.
 """
 
 import pandas as pd
@@ -348,43 +347,41 @@ def format_signal(signal: Signal, include_emoji: bool = False) -> str:
 def format_signal_telegram(signal: Signal) -> str:
     """
     Format signal for Telegram with Markdown styling.
-    
-    Args:
-        signal: Signal object to format
-    
-    Returns:
-        Markdown-formatted text string
+    Unique emojis per pair, TP/SL swapped order, cleaner formatting.
+    Direction and pair on first line.
     """
-    emoji_map = {"BUY": "🟢", "SELL": "🔴", "HOLD": "⏸️"}
-    emoji = emoji_map.get(signal.direction, "")
+    # Direction emoji
+    direction_emoji = {"BUY": "🟢", "SELL": "🔴", "HOLD": "⏸️"}.get(signal.direction, "")
+    
+    # Unique pair emojis
+    pair_emojis = {
+        "XBTUSD": "₿",      # Bitcoin
+        "BTCUSD": "₿",
+        "ETHUSD": "⟠",      # Ethereum
+        "PAXGUSD": "🏅",    # Gold
+        "XAGUSD": "🥈",     # Silver
+        "XAUUSD": "🏅",     # Gold alternate
+        "ETHUSDT": "⟠",
+    }
+    
+    pair_emoji = pair_emojis.get(signal.pair, "📊")
     
     lines = []
     
-    # Leading blank line for breathing room
-    lines.append("")
-    
-    # Divider top
-    lines.append("---")
-    lines.append("")
-    
-    # Header
-    lines.append(f"*{signal.label} ({signal.pair})*")
+    # Direction and pair on the first line
+    lines.append(f"{pair_emoji} {direction_emoji} *{signal.direction} {signal.label} ({signal.pair})*")
     lines.append(f"⏰ {signal.timestamp.strftime('%Y-%m-%d %H:%M:%S')} UTC")
-    lines.append("")
-    
-    # Direction with emoji (bold)
-    lines.append(f"*{emoji} {signal.direction}*")
     lines.append("")
     
     # Price and confidence
     lines.append(f"💰 *Price:* ${signal.price:.2f}")
     lines.append(f"📊 *Confidence:* {signal.confidence}%")
     
-    # TP/SL if available
+    # TP/SL - swapped order (TP first, SL second)
     if signal.stop_loss is not None and signal.take_profit is not None:
         lines.append("")
-        lines.append(f"🛑 *Stop Loss:* ${signal.stop_loss:.2f}")
         lines.append(f"🎯 *Take Profit:* ${signal.take_profit:.2f}")
+        lines.append(f"🛑 *Stop Loss:* ${signal.stop_loss:.2f}")
         if signal.risk_reward_ratio is not None:
             lines.append(f"📈 *Risk/Reward:* 1:{signal.risk_reward_ratio:.2f}")
     
@@ -395,8 +392,8 @@ def format_signal_telegram(signal: Signal) -> str:
         for reason in signal.reasons:
             lines.append(f"• {reason}")
     
+    # Divider at bottom only
     lines.append("")
     lines.append("---")
-    lines.append("")
     
     return "\n".join(lines)

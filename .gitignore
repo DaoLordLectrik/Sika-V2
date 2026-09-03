@@ -31,7 +31,7 @@ data/*.csv
 data/*.json
 !data/.gitkeep
 
-# Backtest results (local only)
+# Backtest results
 backtest_results/
 
 # IDE

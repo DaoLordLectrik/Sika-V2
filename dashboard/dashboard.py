@@ -33,6 +33,14 @@ except ImportError as e:
 DATA_DIR = PROJECT_ROOT / "data"
 SIGNALS_LOG = DATA_DIR / "signals_log.csv"
 
+# Ensure data directory exists
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# If no signals_log.csv exists, create an empty one
+if not SIGNALS_LOG.exists():
+    print("⚠️ No signals_log.csv found. Creating empty file...")
+    with open(SIGNALS_LOG, 'w') as f:
+        f.write("pair,label,timeframe,timestamp,price,direction,confidence,stop_loss,take_profit,risk_reward_ratio,alerted,log_time\n")
 
 def load_signals() -> pd.DataFrame:
     """Load signal log data."""

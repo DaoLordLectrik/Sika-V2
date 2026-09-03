@@ -1,34 +1,45 @@
 #!/usr/bin/env python
 """
 Run the Sika-V2 Trading Dashboard
+Production-ready for Render deployment
 """
 
 import sys
-from pathlib import Path
 import os
+from pathlib import Path
 
-# Add dashboard directory to path
-DASHBOARD_DIR = Path(__file__).parent.absolute()
-sys.path.insert(0, str(DASHBOARD_DIR))
+# Add project root to path
+PROJECT_ROOT = Path(__file__).parent.parent.absolute()
+sys.path.insert(0, str(PROJECT_ROOT))
 
-# Set environment variable for Flask
-os.environ['FLASK_APP'] = 'dashboard.py'
-os.environ['FLASK_ENV'] = 'development'
+# Set environment
+os.environ['FLASK_APP'] = 'dashboard.dashboard'
 
-if __name__ == '__main__':
-    print("""
-    ╔══════════════════════════════════════════════════════════════╗
-    ║                                                              ║
-    ║   📊 Sika-V2 Trading Dashboard                              ║
-    ║                                                              ║
-    ║   Starting server...                                       ║
-    ║                                                              ║
-    ║   Open in your browser:  http://127.0.0.1:5000             ║
-    ║                                                              ║
-    ║   Press Ctrl+C to stop                                      ║
-    ║                                                              ║
-    ╚══════════════════════════════════════════════════════════════╝
-    """)
+# Get port from environment (Render sets this)
+PORT = int(os.environ.get('PORT', 5000))
+
+print("\n" + "="*60)
+print("📊 Sika-V2 Trading Dashboard")
+print("="*60)
+print(f"📁 Project: {PROJECT_ROOT}")
+print(f"🌐 Server starting on port: {PORT}")
+print("="*60 + "\n")
+
+try:
+    from dashboard.dashboard import app
     
-    from dashboard import app
-    app.run(debug=True, host='127.0.0.1', port=5000, threaded=True)
+    # Run with production settings
+    app.run(
+        debug=False,
+        host='0.0.0.0',  # Listen on all interfaces (required for Render)
+        port=PORT,
+        threaded=True
+    )
+except KeyboardInterrupt:
+    print("\n\n👋 Dashboard stopped")
+    sys.exit(0)
+except Exception as e:
+    print(f"\n❌ Error starting dashboard: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)

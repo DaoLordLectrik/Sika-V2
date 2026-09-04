@@ -4,11 +4,11 @@
     "last_alert_time": "2026-09-04T13:30:22.277779"
   },
   "ETHUSD": {
-    "last_alerted_direction": "BUY",
-    "last_alert_time": "2026-09-04T10:45:24.462256"
+    "last_alerted_direction": "SELL",
+    "last_alert_time": "2026-09-04T15:15:20.679146"
   },
   "XBTUSD": {
-    "last_alerted_direction": "BUY",
-    "last_alert_time": "2026-09-04T11:00:25.657152"
+    "last_alerted_direction": "SELL",
+    "last_alert_time": "2026-09-04T15:15:20.679146"
   }
 }

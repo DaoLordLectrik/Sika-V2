@@ -2,11 +2,11 @@
   "pair": "PAXGUSD",
   "label": "Gold (PAXG/USD)",
   "timeframe": "15m",
-  "timestamp": "2026-09-05T10:15:00",
-  "price": 4432.81,
+  "timestamp": "2026-09-05T10:30:00",
+  "price": 4433.24,
   "direction": "SELL",
-  "confidence": 75,
-  "stop_loss": 4433.81350212045,
-  "take_profit": 4430.133994345469,
-  "risk_reward_ratio": 2.6666666666666665
+  "confidence": 50,
+  "stop_loss": 4434.3180725174725,
+  "take_profit": 4430.365139953405,
+  "risk_reward_ratio": 2.6666666666677914
 }

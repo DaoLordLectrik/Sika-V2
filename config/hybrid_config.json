@@ -1,0 +1,35 @@
+{
+  "pairs": [
+    {"symbol": "XBTUSD", "label": "BTC/USD", "interval": "15m"},
+    {"symbol": "ETHUSD", "label": "ETH/USD", "interval": "15m"},
+    {"symbol": "PAXGUSD", "label": "Gold (PAXG/USD)", "interval": "15m"}
+  ],
+  "rule_based": {
+    "enabled": true,
+    "min_confidence": 50,
+    "sl_atr_multiplier": 1.5,
+    "tp_atr_multiplier": 4.0,
+    "trend_filter": true
+  },
+  "ml_model": {
+    "enabled": true,
+    "confidence_threshold": 0.60,
+    "min_training_samples": 100
+  },
+  "sentiment": {
+    "enabled": false,
+    "weight": 0.15
+  },
+  "ensemble": {
+    "rule_weight": 0.40,
+    "ml_weight": 0.45,
+    "sentiment_weight": 0.15,
+    "min_signal_score": 0.55,
+    "require_rule_confirmation": true
+  },
+  "alerts": {
+    "min_confidence": 0.60,
+    "dedup_window_hours": 2,
+    "send_summary": true
+  }
+}

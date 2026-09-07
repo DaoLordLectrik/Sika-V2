@@ -1,9 +1,10 @@
 """
-Hybrid Trading Bot - Simplified Version
+Hybrid Trading Bot - Fixed with CSV Logging
 """
 
 import sys
 import json
+import csv
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
@@ -27,6 +28,10 @@ try:
 except ImportError:
     ML_AVAILABLE = False
 
+# CSV file path
+CSV_FILE = PROJECT_ROOT / "data" / "signals_log.csv"
+
+
 class HybridBot:
     def __init__(self):
         self.config = {
@@ -47,10 +52,14 @@ class HybridBot:
         if ML_AVAILABLE:
             self._load_model()
         
+        # Ensure data directory exists
+        CSV_FILE.parent.mkdir(parents=True, exist_ok=True)
+        
         print("="*60)
         print("🧠 HYBRID BOT STARTED")
         print(f"   ML Available: {ML_AVAILABLE}")
         print(f"   ML Loaded: {self.ml_loaded}")
+        print(f"   CSV Log: {CSV_FILE}")
         print("="*60)
     
     def _load_model(self):
@@ -96,6 +105,35 @@ class HybridBot:
         except:
             return None
     
+    def _log_signal(self, symbol, label, direction, confidence, price, alerted, source='hybrid'):
+        """Log signal to CSV file."""
+        try:
+            # Prepare record
+            record = {
+                'timestamp': datetime.now().isoformat(),
+                'symbol': symbol,
+                'label': label,
+                'direction': direction,
+                'confidence': confidence,
+                'price': price,
+                'alerted': alerted,
+                'source': source
+            }
+            
+            # Write to CSV
+            file_exists = CSV_FILE.exists()
+            
+            with open(CSV_FILE, 'a', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=record.keys())
+                if not file_exists:
+                    writer.writeheader()
+                writer.writerow(record)
+            
+            print(f"  📝 Logged: {direction} ({confidence:.0%})")
+            
+        except Exception as e:
+            print(f"  ⚠️ Log error: {e}")
+    
     def run_check(self):
         """Run one signal check."""
         print(f"\n{'='*60}")
@@ -103,6 +141,7 @@ class HybridBot:
         print(f"{'='*60}")
         
         alerts_sent = 0
+        signals_logged = 0
         
         for pair in self.config['pairs']:
             symbol = pair['symbol']
@@ -122,6 +161,9 @@ class HybridBot:
                 if df.empty:
                     print("  Not enough data")
                     continue
+                
+                # Get current price
+                price = df['close'].iloc[-1]
                 
                 # Rule signal
                 rule_signal = rule_generate_signal(
@@ -150,31 +192,51 @@ class HybridBot:
                 # Combine signals
                 final_direction = 'HOLD'
                 final_confidence = 0
+                final_source = 'rules'
                 
                 if rule_direction != 'HOLD' and ml_direction != 'HOLD':
                     if rule_direction == ml_direction:
                         # Both agree
                         final_direction = rule_direction
                         final_confidence = (rule_confidence * 0.6 + ml_confidence * 0.4)
+                        final_source = 'ensemble_agree'
                     else:
                         # Disagree - trust rules more
                         if rule_confidence > 0.65:
                             final_direction = rule_direction
                             final_confidence = rule_confidence * 0.7
+                            final_source = 'rules_dominant'
+                        elif ml_confidence > 0.75:
+                            final_direction = ml_direction
+                            final_confidence = ml_confidence * 0.6
+                            final_source = 'ml_dominant'
                 elif rule_direction != 'HOLD':
                     # Only rules
                     final_direction = rule_direction
                     final_confidence = rule_confidence * 0.6
+                    final_source = 'rules_only'
                 elif ml_direction != 'HOLD' and ml_confidence > 0.7:
                     # Only ML (high confidence)
                     final_direction = ml_direction
                     final_confidence = ml_confidence * 0.5
+                    final_source = 'ml_only'
                 
-                print(f"  → Final: {final_direction} ({final_confidence:.0%})")
+                print(f"  → Final: {final_direction} ({final_confidence:.0%}) Source: {final_source}")
+                
+                # ⭐ ALWAYS LOG TO CSV - EVEN FOR HOLDS
+                self._log_signal(
+                    symbol=symbol,
+                    label=label,
+                    direction=final_direction,
+                    confidence=final_confidence,
+                    price=price,
+                    alerted=False,
+                    source=final_source
+                )
+                signals_logged += 1
                 
                 # Send alert if confident
                 if final_direction != 'HOLD' and final_confidence >= 0.60:
-                    price = df['close'].iloc[-1]
                     atr = df['atr_14'].iloc[-1]
                     
                     if final_direction == 'BUY':
@@ -184,38 +246,71 @@ class HybridBot:
                         sl = price + (1.5 * atr)
                         tp = price - (4.0 * atr)
                     
-                    msg = f"""
-{pair_emoji(symbol)} *{final_direction} {label}*
-🧠 Hybrid Signal
-⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
-
-💰 Price: ${price:.2f}
-📊 Confidence: {final_confidence:.0%}
-
-📊 *Components:*
-   🔹 Rules: {rule_direction} ({rule_confidence:.0%})
-   🔹 ML:    {ml_direction} ({ml_confidence:.0%})
-
-🎯 TP: ${tp:.2f}
-🛑 SL: ${sl:.2f}
-📈 R/R: 1:2.67
----
-"""
+                    msg = self._format_alert(symbol, label, final_direction, final_confidence, 
+                                            price, sl, tp, rule_direction, rule_confidence,
+                                            ml_direction, ml_confidence, final_source)
+                    
                     send_telegram_message(msg, parse_mode="Markdown")
                     alerts_sent += 1
+                    
+                    # Update log with alerted flag
+                    self._log_signal(
+                        symbol=symbol,
+                        label=label,
+                        direction=final_direction,
+                        confidence=final_confidence,
+                        price=price,
+                        alerted=True,
+                        source=final_source + '_alerted'
+                    )
+                    
                     print(f"  ✅ ALERT SENT")
                 else:
                     print(f"  ⏭️ No alert")
                     
             except Exception as e:
-                print(f"  Error: {e}")
+                print(f"  ❌ Error: {e}")
+                import traceback
+                traceback.print_exc()
         
-        print(f"\nAlerts sent: {alerts_sent}\n")
+        print(f"\n📊 Summary:")
+        print(f"   Signals logged: {signals_logged}")
+        print(f"   Alerts sent: {alerts_sent}")
+        print(f"   CSV file: {CSV_FILE}")
+        print(f"{'='*60}\n")
+        
         return alerts_sent
+    
+    def _format_alert(self, symbol, label, direction, confidence, price, sl, tp,
+                      rule_dir, rule_conf, ml_dir, ml_conf, source):
+        """Format alert message."""
+        emoji = {"BUY": "🟢", "SELL": "🔴"}.get(direction, "")
+        pair_emoji = {"XBTUSD": "₿", "ETHUSD": "⟠", "PAXGUSD": "🏅"}.get(symbol, "📊")
+        
+        lines = []
+        lines.append(f"{pair_emoji} {emoji} *{direction} {label}*")
+        lines.append(f"🧠 *Hybrid Signal* | {source}")
+        lines.append(f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC")
+        lines.append("")
+        lines.append(f"💰 *Price:* ${price:.2f}")
+        lines.append(f"📊 *Confidence:* {confidence:.0%}")
+        lines.append("")
+        lines.append("*📊 Components:*")
+        lines.append(f"   🔹 Rules: {rule_dir} ({rule_conf:.0%})")
+        lines.append(f"   🔹 ML:    {ml_dir} ({ml_conf:.0%})")
+        lines.append("")
+        lines.append(f"🎯 *TP:* ${tp:.2f}")
+        lines.append(f"🛑 *SL:* ${sl:.2f}")
+        lines.append("")
+        lines.append("---")
+        
+        return "\n".join(lines)
+
 
 def pair_emoji(symbol):
     emojis = {"XBTUSD": "₿", "ETHUSD": "⟠", "PAXGUSD": "🏅"}
     return emojis.get(symbol, "📊")
+
 
 if __name__ == "__main__":
     bot = HybridBot()

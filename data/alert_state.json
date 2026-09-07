@@ -1,7 +1,7 @@
 {
   "PAXGUSD": {
     "last_alerted_direction": "SELL",
-    "last_alert_time": "2026-09-07T04:31:29.770238"
+    "last_alert_time": "2026-09-07T06:45:19.068742"
   },
   "ETHUSD": {
     "last_alerted_direction": "BUY",
@@ -9,6 +9,6 @@
   },
   "XBTUSD": {
     "last_alerted_direction": "SELL",
-    "last_alert_time": "2026-09-07T04:00:22.240550"
+    "last_alert_time": "2026-09-07T06:45:19.068742"
   }
 }

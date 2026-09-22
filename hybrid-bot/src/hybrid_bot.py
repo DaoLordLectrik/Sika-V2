@@ -1,5 +1,8 @@
 """
-Hybrid Trading Bot - Fixed with CSV Logging
+Hybrid Trading Bot - Fixed Version
+- Uses separate CSV file
+- Trusts rules when ML unavailable
+- Correct confidence scaling
 """
 
 import sys
@@ -28,8 +31,8 @@ try:
 except ImportError:
     ML_AVAILABLE = False
 
-# CSV file path
-CSV_FILE = PROJECT_ROOT / "data" / "signals_log.csv"
+# ⭐ FIX #1: Separate CSV file for hybrid bot
+CSV_FILE = PROJECT_ROOT / "data" / "hybrid_signals_log.csv"
 
 
 class HybridBot:
@@ -40,9 +43,7 @@ class HybridBot:
                 {"symbol": "ETHUSD", "label": "ETH/USD"},
                 {"symbol": "PAXGUSD", "label": "Gold (PAXG/USD)"}
             ],
-            "rule_weight": 0.60,
-            "ml_weight": 0.40,
-            "min_confidence": 0.60
+            "min_confidence": 0.55,
         }
         
         self.model = None
@@ -72,16 +73,17 @@ class HybridBot:
                 self.scaler = data['scaler']
                 self.ml_loaded = True
                 print("✅ ML model loaded")
-            except:
-                pass
+            except Exception as e:
+                print(f"⚠️ ML model failed to load: {e}")
+        else:
+            print(f"⚠️ ML model not found at {model_path}")
     
     def _get_ml_signal(self, df):
-        """Get ML signal."""
+        """Get ML signal (returns None if not available)."""
         if not self.ml_loaded or not ML_AVAILABLE:
             return None
         
         try:
-            # Simple features
             features = []
             for col in ['rsi_14', 'macd_line', 'macd_signal', 'atr_14']:
                 if col in df.columns and not pd.isna(df[col].iloc[-1]):
@@ -102,25 +104,24 @@ class HybridBot:
                 'confidence': max(probs),
                 'source': 'ml'
             }
-        except:
+        except Exception as e:
+            print(f"  ⚠️ ML prediction error: {e}")
             return None
     
     def _log_signal(self, symbol, label, direction, confidence, price, alerted, source='hybrid'):
-        """Log signal to CSV file."""
+        """Log signal to the HYBRID-ONLY CSV file."""
         try:
-            # Prepare record
             record = {
                 'timestamp': datetime.now().isoformat(),
                 'symbol': symbol,
                 'label': label,
                 'direction': direction,
-                'confidence': confidence,
+                'confidence': round(confidence * 100, 1),  # Store as 0-100
                 'price': price,
                 'alerted': alerted,
                 'source': source
             }
             
-            # Write to CSV
             file_exists = CSV_FILE.exists()
             
             with open(CSV_FILE, 'a', newline='') as f:
@@ -150,7 +151,6 @@ class HybridBot:
             print(f"\n--- {label} ({symbol}) ---")
             
             try:
-                # Get data
                 df = get_klines(symbol, "15m", limit=300)
                 if df.empty:
                     print("  No data")
@@ -162,7 +162,6 @@ class HybridBot:
                     print("  Not enough data")
                     continue
                 
-                # Get current price
                 price = df['close'].iloc[-1]
                 
                 # Rule signal
@@ -182,48 +181,55 @@ class HybridBot:
                 
                 # ML signal
                 ml_signal = self._get_ml_signal(df)
-                ml_direction = 'HOLD'
-                ml_confidence = 0
                 if ml_signal:
                     ml_direction = ml_signal['direction']
                     ml_confidence = ml_signal['confidence']
                     print(f"  ML:    {ml_direction} ({ml_confidence:.0%})")
+                else:
+                    ml_direction = None
+                    ml_confidence = 0
+                    print(f"  ML:    Not available")
                 
-                # Combine signals
+                # ⭐ FIX #2: Combine signals - trust rules when ML unavailable
                 final_direction = 'HOLD'
                 final_confidence = 0
                 final_source = 'rules'
                 
-                if rule_direction != 'HOLD' and ml_direction != 'HOLD':
-                    if rule_direction == ml_direction:
-                        # Both agree
+                if ml_direction is None:
+                    # ML not available - TRUST RULES FULLY
+                    if rule_direction != 'HOLD':
                         final_direction = rule_direction
-                        final_confidence = (rule_confidence * 0.6 + ml_confidence * 0.4)
-                        final_source = 'ensemble_agree'
+                        final_confidence = rule_confidence  # ← FULL confidence
+                        final_source = 'rules_only'
                     else:
-                        # Disagree - trust rules more
-                        if rule_confidence > 0.65:
+                        final_direction = 'HOLD'
+                        final_confidence = 0
+                        final_source = 'rules'
+                else:
+                    # Both available - ensemble logic
+                    if rule_direction != 'HOLD' and ml_direction != 'HOLD':
+                        if rule_direction == ml_direction:
                             final_direction = rule_direction
-                            final_confidence = rule_confidence * 0.7
-                            final_source = 'rules_dominant'
-                        elif ml_confidence > 0.75:
-                            final_direction = ml_direction
-                            final_confidence = ml_confidence * 0.6
-                            final_source = 'ml_dominant'
-                elif rule_direction != 'HOLD':
-                    # Only rules
-                    final_direction = rule_direction
-                    final_confidence = rule_confidence * 0.6
-                    final_source = 'rules_only'
-                elif ml_direction != 'HOLD' and ml_confidence > 0.7:
-                    # Only ML (high confidence)
-                    final_direction = ml_direction
-                    final_confidence = ml_confidence * 0.5
-                    final_source = 'ml_only'
+                            final_confidence = (rule_confidence * 0.6 + ml_confidence * 0.4)
+                            final_source = 'ensemble_agree'
+                        else:
+                            # Disagree - trust rules with high confidence
+                            if rule_confidence >= 0.65:
+                                final_direction = rule_direction
+                                final_confidence = rule_confidence
+                                final_source = 'rules_dominant'
+                    elif rule_direction != 'HOLD':
+                        final_direction = rule_direction
+                        final_confidence = rule_confidence
+                        final_source = 'rules_only'
+                    elif ml_direction != 'HOLD' and ml_confidence > 0.7:
+                        final_direction = ml_direction
+                        final_confidence = ml_confidence * 0.7
+                        final_source = 'ml_only'
                 
                 print(f"  → Final: {final_direction} ({final_confidence:.0%}) Source: {final_source}")
                 
-                # ⭐ ALWAYS LOG TO CSV - EVEN FOR HOLDS
+                # Log to CSV (always)
                 self._log_signal(
                     symbol=symbol,
                     label=label,
@@ -235,8 +241,8 @@ class HybridBot:
                 )
                 signals_logged += 1
                 
-                # Send alert if confident
-                if final_direction != 'HOLD' and final_confidence >= 0.60:
+                # ⭐ FIX #3: Send alert if confidence >= threshold
+                if final_direction != 'HOLD' and final_confidence >= self.config['min_confidence']:
                     atr = df['atr_14'].iloc[-1]
                     
                     if final_direction == 'BUY':
@@ -246,14 +252,16 @@ class HybridBot:
                         sl = price + (1.5 * atr)
                         tp = price - (4.0 * atr)
                     
-                    msg = self._format_alert(symbol, label, final_direction, final_confidence, 
-                                            price, sl, tp, rule_direction, rule_confidence,
-                                            ml_direction, ml_confidence, final_source)
+                    msg = self._format_alert(
+                        symbol, label, final_direction, final_confidence,
+                        price, sl, tp, rule_direction, rule_confidence,
+                        ml_direction, ml_confidence, final_source
+                    )
                     
                     send_telegram_message(msg, parse_mode="Markdown")
                     alerts_sent += 1
                     
-                    # Update log with alerted flag
+                    # Update log with alerted=True
                     self._log_signal(
                         symbol=symbol,
                         label=label,
@@ -266,7 +274,7 @@ class HybridBot:
                     
                     print(f"  ✅ ALERT SENT")
                 else:
-                    print(f"  ⏭️ No alert")
+                    print(f"  ⏭️ No alert (below {self.config['min_confidence']:.0%} threshold)")
                     
             except Exception as e:
                 print(f"  ❌ Error: {e}")
@@ -276,7 +284,6 @@ class HybridBot:
         print(f"\n📊 Summary:")
         print(f"   Signals logged: {signals_logged}")
         print(f"   Alerts sent: {alerts_sent}")
-        print(f"   CSV file: {CSV_FILE}")
         print(f"{'='*60}\n")
         
         return alerts_sent
@@ -287,20 +294,41 @@ class HybridBot:
         emoji = {"BUY": "🟢", "SELL": "🔴"}.get(direction, "")
         pair_emoji = {"XBTUSD": "₿", "ETHUSD": "⟠", "PAXGUSD": "🏅"}.get(symbol, "📊")
         
+        # Direction emoji
+        direction_emoji = {"BUY": "🟢", "SELL": "🔴", "HOLD": "⏸️"}.get(direction, "")
+        pair_emoji = {"XBTUSD": "₿", "ETHUSD": "⟠", "PAXGUSD": "🏅"}.get(symbol, "📊")
+        
         lines = []
-        lines.append(f"{pair_emoji} {emoji} *{direction} {label}*")
-        lines.append(f"🧠 *Hybrid Signal* | {source}")
+        
+        # Direction and pair on the first line
+        lines.append(f"{pair_emoji} {direction_emoji} *{direction} {label} ({symbol})*")
         lines.append(f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC")
         lines.append("")
+        
+        # Price and confidence
         lines.append(f"💰 *Price:* ${price:.2f}")
         lines.append(f"📊 *Confidence:* {confidence:.0%}")
+        
+        # Components
         lines.append("")
-        lines.append("*📊 Components:*")
-        lines.append(f"   🔹 Rules: {rule_dir} ({rule_conf:.0%})")
-        lines.append(f"   🔹 ML:    {ml_dir} ({ml_conf:.0%})")
+        lines.append("*Signal Components:*")
+        lines.append(f"  🔹 Rules: {rule_dir} ({rule_conf:.0%})")
+        if ml_dir:
+            lines.append(f"  🔹 ML: {ml_dir} ({ml_conf:.0%})")
+        else:
+            lines.append(f"  🔹 ML: not available")
+        
+        # TP/SL
         lines.append("")
-        lines.append(f"🎯 *TP:* ${tp:.2f}")
-        lines.append(f"🛑 *SL:* ${sl:.2f}")
+        lines.append(f"🎯 *Take Profit:* ${tp:.2f}")
+        lines.append(f"🛑 *Stop Loss:* ${sl:.2f}")
+        
+        # Risk/Reward
+        risk = abs(price - sl)
+        reward = abs(price - tp)
+        rr_ratio = reward / risk if risk > 0 else 0
+        lines.append(f"📈 *Risk/Reward:* 1:{rr_ratio:.2f}")
+        
         lines.append("")
         lines.append("---")
         

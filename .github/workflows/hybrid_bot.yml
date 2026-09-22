@@ -21,7 +21,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pandas numpy requests python-dotenv
-          pip install scikit-learn joblib ta textblob vaderSentiment
+          pip install "scikit-learn==1.9.0" joblib ta textblob vaderSentiment
           pip install -r hybrid-bot/requirements.txt 2>/dev/null || true
       
       - name: Create data directories

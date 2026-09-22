@@ -1,14 +1,13 @@
 """
-Hybrid Trading Bot - Clean Production Version
-- Separate CSV and state files from original bot
-- Deduplication with 2-hour window
-- Trusts rules when ML unavailable
+Hybrid Trading Bot - Final Fixed Version
+Matches ML training features exactly
 """
 
 import sys
 import json
 import csv
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from datetime import datetime
 
@@ -31,7 +30,7 @@ try:
 except ImportError:
     ML_AVAILABLE = False
 
-# Data files (SEPARATE from original bot)
+# Data files (separate from original bot)
 DATA_DIR = PROJECT_ROOT / "data"
 CSV_FILE = DATA_DIR / "hybrid_signals_log.csv"
 ALERT_STATE_FILE = DATA_DIR / "hybrid_alert_state.json"
@@ -40,9 +39,8 @@ ALERT_STATE_FILE = DATA_DIR / "hybrid_alert_state.json"
 DEDUP_WINDOW_HOURS = 2
 MIN_CONFIDENCE = 0.55
 
-# Pair emojis
-PAIR_EMOJIS = {"XBTUSD": "BTC", "ETHUSD": "ETH", "PAXGUSD": "GOLD"}
-DIRECTION_EMOJIS = {"BUY": "BUY", "SELL": "SELL", "HOLD": "HOLD"}
+# ⭐ Feature order MUST match training (train_ml.py)
+ML_FEATURE_COLS = ['rsi', 'macd', 'macd_signal', 'atr', 'ema9', 'ema21', 'ema50', 'bb_position']
 
 
 class HybridBot:
@@ -143,33 +141,61 @@ class HybridBot:
         else:
             print(f"[WARN] ML model not found at {model_path}")
     
+    def _build_ml_features(self, df):
+        """Build the 8 features the model expects (matches train_ml.py)."""
+        last = df.iloc[-1]
+        
+        # Calculate bb_position
+        bb_range = last['bb_upper'] - last['bb_lower']
+        bb_position = (last['close'] - last['bb_lower']) / bb_range if bb_range > 0 else 0.5
+        
+        features = [
+            last['rsi_14'],
+            last['macd_line'],
+            last['macd_signal'],
+            last['atr_14'],
+            last['ema_9'],
+            last['ema_21'],
+            last['ema_50'],
+            bb_position,
+        ]
+        
+        # Handle any NaN values
+        features = [0 if pd.isna(f) else f for f in features]
+        
+        return np.array([features])  # Shape (1, 8)
+    
     def _get_ml_signal(self, df):
-        """Get ML signal."""
+        """Get ML signal with proper feature engineering."""
         if not self.ml_loaded or not ML_AVAILABLE:
             return None
         
         try:
-            features = []
-            for col in ['rsi_14', 'macd_line', 'macd_signal', 'atr_14']:
-                if col in df.columns and not pd.isna(df[col].iloc[-1]):
-                    features.append(df[col].iloc[-1])
-                else:
-                    features.append(0)
+            # Build features matching training
+            features = self._build_ml_features(df)
             
-            features = [features]
+            # Scale
             if self.scaler:
                 features = self.scaler.transform(features)
             
+            # Predict
             probs = self.model.predict_proba(features)[0]
             pred = self.model.predict(features)[0]
             
             direction_map = {0: 'HOLD', 1: 'BUY', 2: 'SELL'}
+            
             return {
-                'direction': direction_map.get(pred, 'HOLD'),
+                'direction': direction_map.get(int(pred), 'HOLD'),
                 'confidence': float(max(probs)),
+                'probabilities': {
+                    'HOLD': float(probs[0]) if len(probs) > 0 else 0,
+                    'BUY': float(probs[1]) if len(probs) > 1 else 0,
+                    'SELL': float(probs[2]) if len(probs) > 2 else 0
+                },
                 'source': 'ml'
             }
-        except Exception:
+        except Exception as e:
+            print(f"  [WARN] ML prediction error: {e}")
             return None
     
     def _log_signal(self, symbol, label, direction, confidence, price, alerted, source='hybrid'):
@@ -258,17 +284,11 @@ class HybridBot:
                 final_source = 'rules'
                 
                 if ml_direction is None:
-                    # ML not available - trust rules
                     if rule_direction != 'HOLD':
                         final_direction = rule_direction
                         final_confidence = rule_confidence
                         final_source = 'rules_only'
-                    else:
-                        final_direction = 'HOLD'
-                        final_confidence = 0
-                        final_source = 'rules'
                 else:
-                    # Both available
                     if rule_direction != 'HOLD' and ml_direction != 'HOLD':
                         if rule_direction == ml_direction:
                             final_direction = rule_direction
@@ -364,11 +384,11 @@ class HybridBot:
     def _format_alert(self, symbol, label, direction, confidence, price, sl, tp,
                       rule_dir, rule_conf, ml_dir, ml_conf, source):
         """Format alert message."""
-        pair_emoji = PAIR_EMOJIS.get(symbol, "CHART")
-        direction_emoji = DIRECTION_EMOJIS.get(direction, "")
+        pair_labels = {"XBTUSD": "BTC", "ETHUSD": "ETH", "PAXGUSD": "GOLD"}
+        pair_label = pair_labels.get(symbol, "PAIR")
         
         lines = []
-        lines.append(f"[{pair_emoji}] [{direction_emoji}] *{direction} {label} ({symbol})*")
+        lines.append(f"[{pair_label}] *{direction} {label} ({symbol})*")
         lines.append(f"UTC: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append("")
         lines.append(f"*Price:* ${price:.2f}")

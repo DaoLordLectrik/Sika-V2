@@ -383,31 +383,55 @@ class HybridBot:
     
     def _format_alert(self, symbol, label, direction, confidence, price, sl, tp,
                       rule_dir, rule_conf, ml_dir, ml_conf, source):
-        """Format alert message."""
-        pair_labels = {"XBTUSD": "BTC", "ETHUSD": "ETH", "PAXGUSD": "GOLD"}
-        pair_label = pair_labels.get(symbol, "PAIR")
+        """Format alert message with proper emojis using unicode escapes."""
+        # Pair emojis (using unicode escapes to avoid encoding issues)
+        pair_emojis = {
+            "XBTUSD": "\U0001F7E0",   # 🟠 orange circle (Bitcoin-ish)
+            "ETHUSD": "\u039E",        # Ξ (Xi - Greek letter, Ethereum symbol)
+            "PAXGUSD": "\U0001F947",   # 🥇 gold medal
+        }
+        
+        # Direction emojis
+        direction_emojis = {
+            "BUY": "\U0001F7E2",       # 🟢 green circle
+            "SELL": "\U0001F534",      # 🔴 red circle
+            "HOLD": "\u23F8",          # ⏸ pause symbol
+        }
+        
+        # Component emojis
+        rules_emoji = "\U0001F4CA"     # 📊 chart
+        ml_emoji = "\U0001F9E0"        # 🧠 brain
+        price_emoji = "\U0001F4B0"     # 💰 money bag
+        confidence_emoji = "\U0001F4C8"  # 📈 chart increasing
+        tp_emoji = "\U0001F3AF"        # 🎯 direct hit
+        sl_emoji = "\U0001F6D1"        # 🛑 stop sign
+        rr_emoji = "\U0001F4D0"        # 📐 triangular ruler
+        time_emoji = "\u23F0"          # ⏰ alarm clock
+        
+        pair_emoji = pair_emojis.get(symbol, "\U0001F4CA")
+        direction_emoji = direction_emojis.get(direction, "")
         
         lines = []
-        lines.append(f"[{pair_label}] *{direction} {label} ({symbol})*")
-        lines.append(f"UTC: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append(f"{pair_emoji} {direction_emoji} *{direction} {label} ({symbol})*")
+        lines.append(f"{time_emoji} {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC")
         lines.append("")
-        lines.append(f"*Price:* ${price:.2f}")
-        lines.append(f"*Confidence:* {confidence:.0%}")
+        lines.append(f"{price_emoji} *Price:* ${price:.2f}")
+        lines.append(f"{confidence_emoji} *Confidence:* {confidence:.0%}")
         lines.append("")
         lines.append("*Signal Components:*")
-        lines.append(f"  Rules: {rule_dir} ({rule_conf:.0%})")
+        lines.append(f"  {rules_emoji} Rules: {rule_dir} ({rule_conf:.0%})")
         if ml_dir:
-            lines.append(f"  ML: {ml_dir} ({ml_conf:.0%})")
+            lines.append(f"  {ml_emoji} ML: {ml_dir} ({ml_conf:.0%})")
         else:
-            lines.append(f"  ML: not available")
+            lines.append(f"  {ml_emoji} ML: not available")
         lines.append("")
-        lines.append(f"*Take Profit:* ${tp:.2f}")
-        lines.append(f"*Stop Loss:* ${sl:.2f}")
+        lines.append(f"{tp_emoji} *Take Profit:* ${tp:.2f}")
+        lines.append(f"{sl_emoji} *Stop Loss:* ${sl:.2f}")
         
         risk = abs(price - sl)
         reward = abs(price - tp)
         rr_ratio = reward / risk if risk > 0 else 0
-        lines.append(f"*Risk/Reward:* 1:{rr_ratio:.2f}")
+        lines.append(f"{rr_emoji} *Risk/Reward:* 1:{rr_ratio:.2f}")
         lines.append("")
         lines.append("---")
         

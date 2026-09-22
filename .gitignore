@@ -26,9 +26,16 @@ wheels/
 # Environment variables
 .env
 
-# Data files (except .gitkeep) - KEEP THIS
-data/*.csv
-data/*.json
+# Data files - ignore old bot's data
+data/signals_log.csv
+data/latest_signals.json
+data/alert_state.json
+
+# BUT keep hybrid bot's data (needed for dedup persistence)
+!data/hybrid_signals_log.csv
+!data/hybrid_alert_state.json
+
+# Keep .gitkeep
 !data/.gitkeep
 
 # Backtest results
@@ -46,6 +53,3 @@ Thumbs.db
 
 # Logs
 *.log
-
-# NOTE: Do NOT add *.pkl here - we need the ML model!
-# NOTE: Do NOT add models/ here - we need the ML model!

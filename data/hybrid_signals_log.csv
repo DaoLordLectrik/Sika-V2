@@ -1,0 +1,4 @@
+timestamp,symbol,label,direction,confidence,price,alerted,source
+2026-09-22T18:25:39.038998,XBTUSD,BTC/USD,BUY,75.0,86430.7,False,rules_only
+2026-09-22T18:25:39.302267,ETHUSD,ETH/USD,BUY,50.0,2749.32,False,rules_only
+2026-09-22T18:25:39.497107,PAXGUSD,Gold (PAXG/USD),BUY,75.0,4352.4,False,rules_only

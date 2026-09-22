@@ -1,8 +1,7 @@
 name: Hybrid Trading Bot
 
 on:
-  schedule:
-    - cron: "7,22,37,52 * * * *"
+  # schedule removed - using cron-job.org only to avoid duplicates
   workflow_dispatch:
 
 jobs:
@@ -12,8 +11,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.PAT_TOKEN }}
       
       - name: Set up Python
         uses: actions/setup-python@v4

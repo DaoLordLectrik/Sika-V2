@@ -26,7 +26,7 @@ wheels/
 # Environment variables
 .env
 
-# Data files (except .gitkeep)
+# Data files (except .gitkeep) - KEEP THIS
 data/*.csv
 data/*.json
 !data/.gitkeep
@@ -46,3 +46,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# NOTE: Do NOT add *.pkl here - we need the ML model!
+# NOTE: Do NOT add models/ here - we need the ML model!

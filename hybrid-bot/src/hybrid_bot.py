@@ -1,5 +1,8 @@
 """
-Hybrid Trading Bot - With Deduplication
+Hybrid Trading Bot - Clean Production Version
+- Separate CSV and state files from original bot
+- Deduplication with 2-hour window
+- Trusts rules when ML unavailable
 """
 
 import sys
@@ -7,7 +10,7 @@ import json
 import csv
 import pandas as pd
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Add project root
 PROJECT_ROOT = Path(__file__).parent.parent.parent.absolute()
@@ -28,14 +31,18 @@ try:
 except ImportError:
     ML_AVAILABLE = False
 
-# Data files
+# Data files (SEPARATE from original bot)
 DATA_DIR = PROJECT_ROOT / "data"
 CSV_FILE = DATA_DIR / "hybrid_signals_log.csv"
-ALERT_STATE_FILE = DATA_DIR / "hybrid_alert_state.json"  # ⭐ Separate state file
+ALERT_STATE_FILE = DATA_DIR / "hybrid_alert_state.json"
 
-# Deduplication settings
-DEDUP_WINDOW_HOURS = 2       # Minimum time between same-direction alerts
-MIN_CONFIDENCE = 0.55         # Minimum confidence to alert
+# Settings
+DEDUP_WINDOW_HOURS = 2
+MIN_CONFIDENCE = 0.55
+
+# Pair emojis
+PAIR_EMOJIS = {"XBTUSD": "BTC", "ETHUSD": "ETH", "PAXGUSD": "GOLD"}
+DIRECTION_EMOJIS = {"BUY": "BUY", "SELL": "SELL", "HOLD": "HOLD"}
 
 
 class HybridBot:
@@ -58,17 +65,17 @@ class HybridBot:
         # Ensure data directory exists
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         
-        # ⭐ Load alert state
+        # Load alert state
         self.alert_state = self._load_alert_state()
         
-        print("="*60)
-        print("🧠 HYBRID BOT STARTED")
+        print("=" * 60)
+        print("HYBRID BOT STARTED")
         print(f"   ML Available: {ML_AVAILABLE}")
         print(f"   ML Loaded: {self.ml_loaded}")
         print(f"   CSV Log: {CSV_FILE}")
         print(f"   Alert State: {ALERT_STATE_FILE}")
         print(f"   Dedup Window: {DEDUP_WINDOW_HOURS} hours")
-        print("="*60)
+        print("=" * 60)
     
     def _load_alert_state(self):
         """Load deduplication state."""
@@ -76,7 +83,7 @@ class HybridBot:
             try:
                 with open(ALERT_STATE_FILE, 'r') as f:
                     return json.load(f)
-            except:
+            except Exception:
                 pass
         return {}
     
@@ -86,10 +93,7 @@ class HybridBot:
             json.dump(self.alert_state, f, indent=2)
     
     def _should_alert(self, symbol, direction):
-        """
-        Check if we should send an alert.
-        Returns (should_alert: bool, reason: str)
-        """
+        """Check if we should send an alert."""
         last = self.alert_state.get(symbol, {})
         last_direction = last.get('direction')
         last_time_str = last.get('timestamp')
@@ -99,20 +103,20 @@ class HybridBot:
         
         try:
             last_time = datetime.fromisoformat(last_time_str)
-        except:
+        except Exception:
             return True, "invalid_state"
         
         hours_since = (datetime.now() - last_time).total_seconds() / 3600
         
-        # Rule 1: Direction changed → always alert
+        # Direction changed -> always alert
         if last_direction != direction:
-            return True, f"direction_change_{last_direction}_to_{direction}"
+            return True, f"direction_changed_{last_direction}_to_{direction}"
         
-        # Rule 2: Same direction but enough time passed → alert
+        # Same direction but enough time passed
         if hours_since >= DEDUP_WINDOW_HOURS:
             return True, f"same_direction_after_{hours_since:.1f}h"
         
-        # Rule 3: Same direction too soon → suppress
+        # Same direction too soon -> suppress
         return False, f"duplicate_{direction}_{hours_since:.1f}h_ago"
     
     def _record_alert(self, symbol, direction, confidence):
@@ -133,11 +137,11 @@ class HybridBot:
                 self.model = data['model']
                 self.scaler = data['scaler']
                 self.ml_loaded = True
-                print("✅ ML model loaded")
+                print("[OK] ML model loaded")
             except Exception as e:
-                print(f"⚠️ ML model failed to load: {e}")
+                print(f"[WARN] ML model failed to load: {e}")
         else:
-            print(f"⚠️ ML model not found at {model_path}")
+            print(f"[WARN] ML model not found at {model_path}")
     
     def _get_ml_signal(self, df):
         """Get ML signal."""
@@ -162,10 +166,10 @@ class HybridBot:
             direction_map = {0: 'HOLD', 1: 'BUY', 2: 'SELL'}
             return {
                 'direction': direction_map.get(pred, 'HOLD'),
-                'confidence': max(probs),
+                'confidence': float(max(probs)),
                 'source': 'ml'
             }
-        except Exception as e:
+        except Exception:
             return None
     
     def _log_signal(self, symbol, label, direction, confidence, price, alerted, source='hybrid'):
@@ -184,20 +188,19 @@ class HybridBot:
             
             file_exists = CSV_FILE.exists()
             
-            with open(CSV_FILE, 'a', newline='') as f:
+            with open(CSV_FILE, 'a', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=record.keys())
                 if not file_exists:
                     writer.writeheader()
                 writer.writerow(record)
-            
         except Exception as e:
-            print(f"  ⚠️ Log error: {e}")
+            print(f"  [WARN] Log error: {e}")
     
     def run_check(self):
         """Run one signal check."""
-        print(f"\n{'='*60}")
+        print("\n" + "=" * 60)
         print(f"Signal Check - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"{'='*60}")
+        print("=" * 60)
         
         alerts_sent = 0
         signals_logged = 0
@@ -255,6 +258,7 @@ class HybridBot:
                 final_source = 'rules'
                 
                 if ml_direction is None:
+                    # ML not available - trust rules
                     if rule_direction != 'HOLD':
                         final_direction = rule_direction
                         final_confidence = rule_confidence
@@ -264,6 +268,7 @@ class HybridBot:
                         final_confidence = 0
                         final_source = 'rules'
                 else:
+                    # Both available
                     if rule_direction != 'HOLD' and ml_direction != 'HOLD':
                         if rule_direction == ml_direction:
                             final_direction = rule_direction
@@ -283,7 +288,7 @@ class HybridBot:
                         final_confidence = ml_confidence * 0.7
                         final_source = 'ml_only'
                 
-                print(f"  → Final: {final_direction} ({final_confidence:.0%}) Source: {final_source}")
+                print(f"  -> Final: {final_direction} ({final_confidence:.0%}) Source: {final_source}")
                 
                 # Log to CSV (always)
                 self._log_signal(
@@ -297,7 +302,7 @@ class HybridBot:
                 )
                 signals_logged += 1
                 
-                # ⭐ DEDUPLICATION CHECK
+                # Check dedup and alert
                 if final_direction != 'HOLD' and final_confidence >= MIN_CONFIDENCE:
                     should_alert, reason = self._should_alert(symbol, final_direction)
                     
@@ -321,7 +326,6 @@ class HybridBot:
                         
                         if success:
                             alerts_sent += 1
-                            # ⭐ Record the alert for deduplication
                             self._record_alert(symbol, final_direction, final_confidence)
                             
                             self._log_signal(
@@ -334,55 +338,56 @@ class HybridBot:
                                 source=final_source + '_alerted'
                             )
                             
-                            print(f"  ✅ ALERT SENT ({reason})")
+                            print(f"  [OK] ALERT SENT ({reason})")
                         else:
-                            print(f"  ❌ ALERT FAILED")
+                            print(f"  [FAIL] ALERT FAILED")
                     else:
                         alerts_suppressed += 1
-                        print(f"  ⏭️ Suppressed: {reason}")
+                        print(f"  [SKIP] Suppressed: {reason}")
                 else:
-                    print(f"  ⏭️ Below threshold ({final_confidence:.0%} < {MIN_CONFIDENCE:.0%})")
+                    print(f"  [SKIP] Below threshold ({final_confidence:.0%} < {MIN_CONFIDENCE:.0%})")
                     
             except Exception as e:
-                print(f"  ❌ Error: {e}")
+                print(f"  [ERROR] {e}")
                 import traceback
                 traceback.print_exc()
         
-        print(f"\n📊 Summary:")
+        print("\n" + "=" * 60)
+        print("Summary:")
         print(f"   Signals logged: {signals_logged}")
         print(f"   Alerts sent: {alerts_sent}")
         print(f"   Alerts suppressed: {alerts_suppressed}")
-        print(f"{'='*60}\n")
+        print("=" * 60 + "\n")
         
         return alerts_sent
     
     def _format_alert(self, symbol, label, direction, confidence, price, sl, tp,
                       rule_dir, rule_conf, ml_dir, ml_conf, source):
         """Format alert message."""
-        direction_emoji = {"BUY": "🟢", "SELL": "🔴", "HOLD": "⏸️"}.get(direction, "")
-        pair_emoji = {"XBTUSD": "₿", "ETHUSD": "⟠", "PAXGUSD": "🏅"}.get(symbol, "📊")
+        pair_emoji = PAIR_EMOJIS.get(symbol, "CHART")
+        direction_emoji = DIRECTION_EMOJIS.get(direction, "")
         
         lines = []
-        lines.append(f"{pair_emoji} {direction_emoji} *{direction} {label} ({symbol})*")
-        lines.append(f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC")
+        lines.append(f"[{pair_emoji}] [{direction_emoji}] *{direction} {label} ({symbol})*")
+        lines.append(f"UTC: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append("")
-        lines.append(f"💰 *Price:* ${price:.2f}")
-        lines.append(f"📊 *Confidence:* {confidence:.0%}")
+        lines.append(f"*Price:* ${price:.2f}")
+        lines.append(f"*Confidence:* {confidence:.0%}")
         lines.append("")
         lines.append("*Signal Components:*")
-        lines.append(f"  🔹 Rules: {rule_dir} ({rule_conf:.0%})")
+        lines.append(f"  Rules: {rule_dir} ({rule_conf:.0%})")
         if ml_dir:
-            lines.append(f"  🔹 ML: {ml_dir} ({ml_conf:.0%})")
+            lines.append(f"  ML: {ml_dir} ({ml_conf:.0%})")
         else:
-            lines.append(f"  🔹 ML: not available")
+            lines.append(f"  ML: not available")
         lines.append("")
-        lines.append(f"🎯 *Take Profit:* ${tp:.2f}")
-        lines.append(f"🛑 *Stop Loss:* ${sl:.2f}")
+        lines.append(f"*Take Profit:* ${tp:.2f}")
+        lines.append(f"*Stop Loss:* ${sl:.2f}")
         
         risk = abs(price - sl)
         reward = abs(price - tp)
         rr_ratio = reward / risk if risk > 0 else 0
-        lines.append(f"📈 *Risk/Reward:* 1:{rr_ratio:.2f}")
+        lines.append(f"*Risk/Reward:* 1:{rr_ratio:.2f}")
         lines.append("")
         lines.append("---")
         

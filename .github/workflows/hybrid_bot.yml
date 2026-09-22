@@ -34,6 +34,9 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PYTHONIOENCODING: utf-8 
+          LANG: C.UTF-8
+          LC_ALL: C.UTF-8
         run: |
           python hybrid-bot/scripts/run_hybrid.py
       
